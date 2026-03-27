@@ -28,11 +28,39 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Firestore client
-try:
-    db = firestore.Client(project=GCP_PROJECT)
-except Exception:
-    db = None
+# Firestore client - lazy init
+class FirestoreProxy:
+    def __init__(self):
+        self._client = None
+        self._initialized = False
+    
+    def _ensure_init(self):
+        if not self._initialized:
+            try:
+                self._client = firestore.Client(project=GCP_PROJECT)
+                self._initialized = True
+                print(f"Firestore connected to project {GCP_PROJECT}")
+            except Exception as e:
+                print(f"Firestore init warning: {e}")
+                self._client = None
+                self._initialized = True
+    
+    def collection(self, *args, **kwargs):
+        self._ensure_init()
+        if self._client is None:
+            return None
+        return self._client.collection(*args, **kwargs)
+    
+    @property
+    def available(self):
+        self._ensure_init()
+        return self._client is not None
+
+    def __bool__(self):
+        self._ensure_init()
+        return self._client is not None
+
+db = FirestoreProxy()
 
 # --- Models ---
 class UserCreate(BaseModel):
@@ -93,7 +121,10 @@ def require_admin(user=Depends(get_current_user)):
 def get_user_by_email(email: str):
     if not db:
         return None
-    users = db.collection("platform_users").where("email", "==", email).limit(1).stream()
+    coll = db.collection("platform_users")
+    if coll is None:
+        return None
+    users = coll.where("email", "==", email).limit(1).stream()
     for u in users:
         data = u.to_dict()
         data["id"] = u.id
@@ -102,20 +133,24 @@ def get_user_by_email(email: str):
 
 def ensure_admin():
     """Create default admin user if not exists."""
-    if not db:
-        return
-    existing = get_user_by_email(ADMIN_EMAIL)
-    if not existing:
-        admin_id = str(uuid.uuid4())
-        db.collection("platform_users").document(admin_id).set({
-            "email": ADMIN_EMAIL,
-            "password_hash": pwd_context.hash(ADMIN_PASSWORD),
-            "name": "Platform Admin",
-            "role": "admin",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "status": "active"
-        })
-        print(f"Admin user created: {ADMIN_EMAIL}")
+    try:
+        if not db:
+            print("Firestore not available, skipping admin creation")
+            return
+        existing = get_user_by_email(ADMIN_EMAIL)
+        if not existing:
+            admin_id = str(uuid.uuid4())
+            db.collection("platform_users").document(admin_id).set({
+                "email": ADMIN_EMAIL,
+                "password_hash": pwd_context.hash(ADMIN_PASSWORD),
+                "name": "Platform Admin",
+                "role": "admin",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "status": "active"
+            })
+            print(f"Admin user created: {ADMIN_EMAIL}")
+    except Exception as e:
+        print(f"Admin creation warning: {e}")
 
 @app.on_event("startup")
 async def startup():
