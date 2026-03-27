@@ -8,7 +8,6 @@ env:
   PROJECT_ID: apex-internal-apps
   REGION: us-central1
   SERVICE: agent-platform
-  IMAGE: us-central1-docker.pkg.dev/apex-internal-apps/cloud-run-source-deploy/agent-platform
 
 jobs:
   deploy:
@@ -30,16 +29,17 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-      - name: Build and Push
+      - name: Build and Push to Artifact Registry
         run: |
-          docker build -t ${{ env.IMAGE }}:${{ github.sha }} -t ${{ env.IMAGE }}:latest .
-          docker push ${{ env.IMAGE }}:${{ github.sha }}
-          docker push ${{ env.IMAGE }}:latest
+          docker build -t us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/workflow-assistant/${{ env.SERVICE }}:${{ github.sha }} .
+          docker build -t us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/workflow-assistant/${{ env.SERVICE }}:latest .
+          docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/workflow-assistant/${{ env.SERVICE }}:${{ github.sha }}
+          docker push us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/workflow-assistant/${{ env.SERVICE }}:latest
 
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE }} \
-            --image ${{ env.IMAGE }}:${{ github.sha }} \
+            --image us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/workflow-assistant/${{ env.SERVICE }}:${{ github.sha }} \
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
@@ -48,4 +48,5 @@ jobs:
             --cpu 1 \
             --min-instances 0 \
             --max-instances 10 \
-            --set-env-vars "GCP_PROJECT=apex-internal-apps,ADMIN_EMAIL=admin@agentplatform.ai,ADMIN_PASSWORD=AgentPlatform2026!"
+            --set-env-vars "GCP_PROJECT=apex-internal-apps,ADMIN_EMAIL=admin@agentplatform.ai,ADMIN_PASSWORD=AgentPlatform2026!" \
+            --quiet

@@ -1,0 +1,5 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/apex-internal-apps/workflow-assistant/agent-platform:latest', '.']
+images:
+  - 'us-central1-docker.pkg.dev/apex-internal-apps/workflow-assistant/agent-platform:latest'
