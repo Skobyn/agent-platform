@@ -108,7 +108,10 @@ class Store:
                 return None
             except Exception as e:
                 print(f"[store] Firestore get error: {e}")
-        return self._get_collection(collection).get(doc_id)
+        doc = self._get_collection(collection).get(doc_id)
+        if doc:
+            doc["id"] = doc_id
+        return doc
     
     def set_doc(self, collection: str, doc_id: str, data: dict):
         fs = self._fs

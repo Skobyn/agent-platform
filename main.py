@@ -112,7 +112,9 @@ def ensure_admin():
 
 @app.on_event("startup")
 async def startup():
+    print("[startup] Agent Platform starting...")
     ensure_admin()
+    print("[startup] Ready.")
 
 # --- HTML Page Serving ---
 def read_template(name: str) -> str:
@@ -148,29 +150,45 @@ async def health():
 # --- API: Auth ---
 @app.post("/api/auth/signup")
 async def api_signup(user: UserCreate):
-    existing = get_user_by_email(user.email)
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    user_id = str(uuid.uuid4())
-    name = user.name or user.email.split("@")[0]
-    store.set_doc(USERS_COLLECTION, user_id, {
-        "email": user.email,
-        "password_hash": pwd_context.hash(user.password),
-        "name": name,
-        "role": "user",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "status": "active"
-    })
-    
-    token = create_token({"sub": user_id, "email": user.email, "role": "user", "name": name})
-    return {"access_token": token, "token_type": "bearer", "user_id": user_id}
+    try:
+        existing = get_user_by_email(user.email)
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        user_id = str(uuid.uuid4())
+        name = user.name or user.email.split("@")[0]
+        store.set_doc(USERS_COLLECTION, user_id, {
+            "email": user.email,
+            "password_hash": pwd_context.hash(user.password),
+            "name": name,
+            "role": "user",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": "active"
+        })
+        
+        token = create_token({"sub": user_id, "email": user.email, "role": "user", "name": name})
+        return {"access_token": token, "token_type": "bearer", "user_id": user_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Signup error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/auth/login")
 async def api_login(user: UserLogin):
-    existing = get_user_by_email(user.email)
-    if not existing or not pwd_context.verify(user.password, existing.get("password_hash", "")):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    try:
+        existing = get_user_by_email(user.email)
+        if not existing:
+            print(f"[auth] Login failed: user not found for {user.email}")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        if not pwd_context.verify(user.password, existing.get("password_hash", "")):
+            print(f"[auth] Login failed: wrong password for {user.email}")
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[auth] Login error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     
     token = create_token({
         "sub": existing["id"],
