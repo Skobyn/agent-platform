@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Agent Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="logo">⚡</div>
+                Admin Panel
+            </div>
+            <nav class="sidebar-nav">
+                <div class="sidebar-link active" onclick="showSection('overview')">
+                    📊 Overview
+                </div>
+                <div class="sidebar-link" onclick="showSection('users')">
+                    👥 Users
+                </div>
+                <div class="sidebar-link" onclick="showSection('all-agents')">
+                    🤖 All Agents
+                </div>
+                <div class="sidebar-link" onclick="showSection('deploy')">
+                    🚀 Deploy Agent
+                </div>
+            </nav>
+            <div class="sidebar-user">
+                <div class="user-name">Admin</div>
+                <div class="user-email" id="admin-email"></div>
+                <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" onclick="logout()">Log Out</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Overview -->
+            <div id="section-overview">
+                <div class="page-header"><h1>Platform Overview</h1></div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Users</div>
+                        <div class="stat-value" id="s-users">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Agents</div>
+                        <div class="stat-value" id="s-agents">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Agents</div>
+                        <div class="stat-value" id="s-active" style="color:var(--success)">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Suspended</div>
+                        <div class="stat-value" id="s-suspended" style="color:var(--danger)">-</div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top:24px;">
+                    <h3 style="margin-bottom:16px;">Recent Agents</h3>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr>
+                                <th>Name</th><th>Owner</th><th>Model</th><th>Status</th><th>Created</th><th>Actions</th>
+                            </tr></thead>
+                            <tbody id="recent-agents-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users -->
+            <div id="section-users" style="display:none;">
+                <div class="page-header"><h1>All Users</h1></div>
+                <div class="card">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr>
+                                <th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th>
+                            </tr></thead>
+                            <tbody id="users-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- All Agents -->
+            <div id="section-all-agents" style="display:none;">
+                <div class="page-header"><h1>All Agents</h1></div>
+                <div class="agents-grid" id="admin-agents-grid"></div>
+            </div>
+
+            <!-- Deploy Agent -->
+            <div id="section-deploy" style="display:none;">
+                <div class="page-header"><h1>Deploy Agent for User</h1></div>
+                <div class="card" style="max-width:600px;">
+                    <form id="deploy-form" onsubmit="handleDeploy(event)">
+                        <div class="input-group">
+                            <label for="deploy-owner">Owner (User ID)</label>
+                            <select id="deploy-owner"></select>
+                        </div>
+                        <div class="input-group">
+                            <label for="deploy-name">Agent Name</label>
+                            <input type="text" id="deploy-name" placeholder="Customer Support Bot" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="deploy-model">Model</label>
+                            <select id="deploy-model">
+                                <option value="gpt-4">GPT-4</option>
+                                <option value="gpt-4o">GPT-4o</option>
+                                <option value="claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                                <option value="claude-3-opus">Claude 3 Opus</option>
+                                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="deploy-prompt">System Prompt</label>
+                            <textarea id="deploy-prompt" placeholder="You are a helpful assistant..."></textarea>
+                        </div>
+                        <div class="input-group">
+                            <label for="deploy-caps">Capabilities</label>
+                            <input type="text" id="deploy-caps" placeholder="chat, search, summarize">
+                        </div>
+                        <button type="submit" class="btn btn-primary">🚀 Deploy Agent</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal-overlay" id="edit-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Edit Agent</h2>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <form id="edit-form" onsubmit="handleEdit(event)">
+                <div class="input-group">
+                    <label>Agent Name</label>
+                    <input type="text" id="edit-name" required>
+                </div>
+                <div class="input-group">
+                    <label>Model</label>
+                    <select id="edit-model">
+                        <option value="gpt-4">GPT-4</option>
+                        <option value="gpt-4o">GPT-4o</option>
+                        <option value="claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                        <option value="claude-3-opus">Claude 3 Opus</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>System Prompt</label>
+                    <textarea id="edit-prompt"></textarea>
+                </div>
+                <div class="input-group">
+                    <label>Capabilities</label>
+                    <input type="text" id="edit-caps">
+                </div>
+                <input type="hidden" id="edit-id">
+                <div style="display:flex;gap:12px;margin-top:8px;">
+                    <button type="submit" class="btn btn-primary" style="flex:1;">Save</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        const API = '';
+        let allUsers = [];
+        let allAgents = [];
+
+        function getToken() { return localStorage.getItem('token'); }
+
+        async function apiFetch(url, opts = {}) {
+            const token = getToken();
+            if (!token) { window.location.href = '/login'; return; }
+            opts.headers = { ...opts.headers, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+            const res = await fetch(API + url, opts);
+            if (res.status === 401 || res.status === 403) { localStorage.clear(); window.location.href = '/login'; return; }
+            return res;
+        }
+
+        function toast(msg, type = 'success') {
+            const el = document.createElement('div');
+            el.className = `toast toast-${type}`;
+            el.textContent = msg;
+            document.getElementById('toast-container').appendChild(el);
+            setTimeout(() => el.remove(), 4000);
+        }
+
+        function showSection(name) {
+            document.querySelectorAll('[id^="section-"]').forEach(el => el.style.display = 'none');
+            document.getElementById('section-' + name).style.display = 'block';
+            document.querySelectorAll('.sidebar-link').forEach(el => el.classList.remove('active'));
+            event.target.closest('.sidebar-link').classList.add('active');
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/login'; }
+
+        async function loadStats() {
+            const res = await apiFetch('/api/admin/stats');
+            if (!res) return;
+            const s = await res.json();
+            document.getElementById('s-users').textContent = s.total_users;
+            document.getElementById('s-agents').textContent = s.total_agents;
+            document.getElementById('s-active').textContent = s.active_agents;
+            document.getElementById('s-suspended').textContent = s.suspended_agents;
+        }
+
+        async function loadUsers() {
+            const res = await apiFetch('/api/admin/users');
+            if (!res) return;
+            const data = await res.json();
+            allUsers = data.users || [];
+            
+            // Users table
+            const tbody = document.getElementById('users-tbody');
+            tbody.innerHTML = allUsers.map(u => `
+                <tr>
+                    <td>${u.name || '-'}</td>
+                    <td>${u.email}</td>
+                    <td><span class="badge ${u.role === 'admin' ? 'badge-active' : 'badge-paused'}">${u.role}</span></td>
+                    <td>${u.status || 'active'}</td>
+                    <td>${u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}</td>
+                </tr>
+            `).join('');
+
+            // Deploy owner dropdown
+            const sel = document.getElementById('deploy-owner');
+            sel.innerHTML = allUsers.filter(u => u.role !== 'admin').map(u =>
+                `<option value="${u.id}">${u.name || u.email} (${u.email})</option>`
+            ).join('');
+            if (sel.innerHTML === '') sel.innerHTML = '<option value="">No users yet</option>';
+        }
+
+        async function loadAllAgents() {
+            const res = await apiFetch('/api/admin/agents');
+            if (!res) return;
+            const data = await res.json();
+            allAgents = data.agents || [];
+
+            // Recent table
+            const tbody = document.getElementById('recent-agents-tbody');
+            const sorted = [...allAgents].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+            tbody.innerHTML = sorted.slice(0, 10).map(a => {
+                const sc = a.status === 'active' ? 'badge-active' : a.status === 'suspended' ? 'badge-suspended' : 'badge-paused';
+                return `<tr>
+                    <td><strong>${a.name}</strong></td>
+                    <td>${a.owner_email || a.owner_id}</td>
+                    <td>${a.model}</td>
+                    <td><span class="badge ${sc}">${a.status}</span></td>
+                    <td>${a.created_at ? new Date(a.created_at).toLocaleDateString() : '-'}</td>
+                    <td>
+                        <button class="btn btn-ghost btn-sm" onclick='openEdit(${JSON.stringify(a).replace(/'/g, "&#39;")})'>Edit</button>
+                        ${a.status === 'suspended' 
+                            ? `<button class="btn btn-success btn-sm" onclick="activateAgent('${a.id}')">Activate</button>`
+                            : `<button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="suspendAgent('${a.id}')">Suspend</button>`
+                        }
+                    </td>
+                </tr>`;
+            }).join('');
+
+            // Grid view
+            const grid = document.getElementById('admin-agents-grid');
+            grid.innerHTML = allAgents.map(a => {
+                const sc = a.status === 'active' ? 'badge-active' : a.status === 'suspended' ? 'badge-suspended' : 'badge-paused';
+                return `<div class="agent-card">
+                    <div class="agent-card-header">
+                        <h3>${a.name}</h3>
+                        <span class="badge ${sc}">${a.status}</span>
+                    </div>
+                    <div class="agent-meta">
+                        <span>👤 Owner: ${a.owner_email || a.owner_id}</span>
+                        <span>🧠 Model: ${a.model}</span>
+                        <span>📅 ${a.created_at ? new Date(a.created_at).toLocaleDateString() : '-'}</span>
+                    </div>
+                    <div class="agent-actions">
+                        <button class="btn btn-secondary btn-sm" onclick='openEdit(${JSON.stringify(a).replace(/'/g, "&#39;")})'>Edit</button>
+                        ${a.status === 'suspended'
+                            ? `<button class="btn btn-success btn-sm" onclick="activateAgent('${a.id}')">Activate</button>`
+                            : `<button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="suspendAgent('${a.id}')">Suspend</button>`
+                        }
+                        <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="deleteAgent('${a.id}','${a.name}')">Delete</button>
+                    </div>
+                </div>`;
+            }).join('') || '<div class="empty-state"><div class="icon">🤖</div><p>No agents deployed yet.</p></div>';
+        }
+
+        async function suspendAgent(id) {
+            await apiFetch(`/api/admin/agents/${id}/suspend`, { method: 'PUT' });
+            toast('Agent suspended');
+            loadAllAgents(); loadStats();
+        }
+
+        async function activateAgent(id) {
+            await apiFetch(`/api/admin/agents/${id}/activate`, { method: 'PUT' });
+            toast('Agent activated');
+            loadAllAgents(); loadStats();
+        }
+
+        async function deleteAgent(id, name) {
+            if (!confirm(`Delete agent "${name}"?`)) return;
+            await apiFetch(`/api/agents/${id}`, { method: 'DELETE' });
+            toast('Agent deleted');
+            loadAllAgents(); loadStats();
+        }
+
+        function openEdit(agent) {
+            document.getElementById('edit-name').value = agent.name;
+            document.getElementById('edit-model').value = agent.model;
+            document.getElementById('edit-prompt').value = agent.system_prompt || '';
+            document.getElementById('edit-caps').value = agent.capabilities || '';
+            document.getElementById('edit-id').value = agent.id;
+            document.getElementById('edit-modal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.remove('active');
+        }
+
+        async function handleEdit(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+            await apiFetch(`/api/agents/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    name: document.getElementById('edit-name').value,
+                    model: document.getElementById('edit-model').value,
+                    system_prompt: document.getElementById('edit-prompt').value,
+                    capabilities: document.getElementById('edit-caps').value
+                })
+            });
+            closeEditModal();
+            toast('Agent updated');
+            loadAllAgents();
+        }
+
+        async function handleDeploy(e) {
+            e.preventDefault();
+            const ownerId = document.getElementById('deploy-owner').value;
+            if (!ownerId) { toast('Select a user first', 'error'); return; }
+            
+            const ownerUser = allUsers.find(u => u.id === ownerId);
+            
+            // Create agent as admin but set owner
+            const res = await apiFetch('/api/agents', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: document.getElementById('deploy-name').value,
+                    model: document.getElementById('deploy-model').value,
+                    system_prompt: document.getElementById('deploy-prompt').value,
+                    capabilities: document.getElementById('deploy-caps').value
+                })
+            });
+            
+            if (res && res.ok) {
+                const agent = await res.json();
+                // Update owner to the selected user
+                if (ownerUser) {
+                    await apiFetch(`/api/agents/${agent.id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({})
+                    });
+                }
+                toast('Agent deployed successfully');
+                document.getElementById('deploy-form').reset();
+                loadAllAgents(); loadStats();
+            }
+        }
+
+        // Init
+        async function init() {
+            const token = getToken();
+            if (!token) { window.location.href = '/login'; return; }
+            
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            if (payload.role !== 'admin') { window.location.href = '/dashboard'; return; }
+            
+            document.getElementById('admin-email').textContent = payload.email;
+            await Promise.all([loadStats(), loadUsers(), loadAllAgents()]);
+        }
+
+        init();
+    </script>
+</body>
+</html>

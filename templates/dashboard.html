@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Agent Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="logo">⚡</div>
+                Agent Platform
+            </div>
+            <nav class="sidebar-nav">
+                <div class="sidebar-link active" onclick="showSection('agents')">
+                    🤖 My Agents
+                </div>
+                <div class="sidebar-link" onclick="showSection('activity')">
+                    📊 Activity
+                </div>
+                <div class="sidebar-link" onclick="showSection('settings')">
+                    ⚙️ Settings
+                </div>
+            </nav>
+            <div class="sidebar-user">
+                <div class="user-name" id="user-name">Loading...</div>
+                <div class="user-email" id="user-email"></div>
+                <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%;" onclick="logout()">Log Out</button>
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="main-content">
+            <!-- Agents Section -->
+            <div id="section-agents">
+                <div class="page-header">
+                    <h1>My Agents</h1>
+                    <button class="btn btn-primary" onclick="openCreateModal()">+ New Agent</button>
+                </div>
+
+                <div class="stats-grid" id="user-stats">
+                    <div class="stat-card">
+                        <div class="stat-label">Total Agents</div>
+                        <div class="stat-value" id="stat-total">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active</div>
+                        <div class="stat-value" id="stat-active" style="color:var(--success)">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Paused</div>
+                        <div class="stat-value" id="stat-paused" style="color:var(--warning)">0</div>
+                    </div>
+                </div>
+
+                <div class="agents-grid" id="agents-grid">
+                    <div class="empty-state" id="empty-state">
+                        <div class="icon">🤖</div>
+                        <p>You haven't created any agents yet.<br>Click "New Agent" to get started.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Section -->
+            <div id="section-activity" style="display:none;">
+                <div class="page-header"><h1>Activity Feed</h1></div>
+                <div class="card" style="padding:40px;text-align:center;color:var(--text-secondary);">
+                    <p>📊 Activity tracking coming soon. Deploy an agent to see activity here.</p>
+                </div>
+            </div>
+
+            <!-- Settings Section -->
+            <div id="section-settings" style="display:none;">
+                <div class="page-header"><h1>Settings</h1></div>
+                <div class="card">
+                    <h3 style="margin-bottom:20px;">Account Settings</h3>
+                    <div class="input-group">
+                        <label>Email</label>
+                        <input type="email" id="settings-email" disabled>
+                    </div>
+                    <div class="input-group">
+                        <label>Name</label>
+                        <input type="text" id="settings-name" disabled>
+                    </div>
+                    <p style="color:var(--text-muted);font-size:0.85rem;margin-top:12px;">Profile editing coming soon.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <div class="modal-overlay" id="agent-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modal-title">Create New Agent</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="agent-form" onsubmit="handleAgentSubmit(event)">
+                <div class="input-group">
+                    <label for="agent-name">Agent Name</label>
+                    <input type="text" id="agent-name" placeholder="e.g., Customer Support Bot" required>
+                </div>
+                <div class="input-group">
+                    <label for="agent-model">Model</label>
+                    <select id="agent-model">
+                        <option value="gpt-4">GPT-4</option>
+                        <option value="gpt-4o">GPT-4o</option>
+                        <option value="claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+                        <option value="claude-3-opus">Claude 3 Opus</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="agent-prompt">System Prompt</label>
+                    <textarea id="agent-prompt" placeholder="You are a helpful assistant that..."></textarea>
+                </div>
+                <div class="input-group">
+                    <label for="agent-capabilities">Capabilities (comma-separated)</label>
+                    <input type="text" id="agent-capabilities" placeholder="chat, search, summarize">
+                </div>
+                <input type="hidden" id="edit-agent-id">
+                <div style="display:flex;gap:12px;margin-top:8px;">
+                    <button type="submit" class="btn btn-primary" style="flex:1;" id="modal-submit-btn">Create Agent</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        const API = '';
+        let currentUser = null;
+        let editingAgent = null;
+
+        function getToken() { return localStorage.getItem('token'); }
+        
+        async function apiFetch(url, opts = {}) {
+            const token = getToken();
+            if (!token) { window.location.href = '/login'; return; }
+            opts.headers = { ...opts.headers, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+            const res = await fetch(API + url, opts);
+            if (res.status === 401) { localStorage.clear(); window.location.href = '/login'; return; }
+            return res;
+        }
+
+        function toast(msg, type = 'success') {
+            const el = document.createElement('div');
+            el.className = `toast toast-${type}`;
+            el.textContent = msg;
+            document.getElementById('toast-container').appendChild(el);
+            setTimeout(() => el.remove(), 4000);
+        }
+
+        function showSection(name) {
+            document.querySelectorAll('[id^="section-"]').forEach(el => el.style.display = 'none');
+            document.getElementById('section-' + name).style.display = 'block';
+            document.querySelectorAll('.sidebar-link').forEach(el => el.classList.remove('active'));
+            event.target.closest('.sidebar-link').classList.add('active');
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = '/login';
+        }
+
+        function openCreateModal() {
+            editingAgent = null;
+            document.getElementById('modal-title').textContent = 'Create New Agent';
+            document.getElementById('modal-submit-btn').textContent = 'Create Agent';
+            document.getElementById('agent-form').reset();
+            document.getElementById('edit-agent-id').value = '';
+            document.getElementById('agent-modal').classList.add('active');
+        }
+
+        function openEditModal(agent) {
+            editingAgent = agent;
+            document.getElementById('modal-title').textContent = 'Edit Agent';
+            document.getElementById('modal-submit-btn').textContent = 'Save Changes';
+            document.getElementById('agent-name').value = agent.name;
+            document.getElementById('agent-model').value = agent.model;
+            document.getElementById('agent-prompt').value = agent.system_prompt || '';
+            document.getElementById('agent-capabilities').value = agent.capabilities || '';
+            document.getElementById('edit-agent-id').value = agent.id;
+            document.getElementById('agent-modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('agent-modal').classList.remove('active');
+        }
+
+        async function handleAgentSubmit(e) {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('agent-name').value,
+                model: document.getElementById('agent-model').value,
+                system_prompt: document.getElementById('agent-prompt').value,
+                capabilities: document.getElementById('agent-capabilities').value
+            };
+            
+            const agentId = document.getElementById('edit-agent-id').value;
+            
+            if (agentId) {
+                await apiFetch(`/api/agents/${agentId}`, { method: 'PUT', body: JSON.stringify(data) });
+                toast('Agent updated successfully');
+            } else {
+                await apiFetch('/api/agents', { method: 'POST', body: JSON.stringify(data) });
+                toast('Agent created successfully');
+            }
+            closeModal();
+            loadAgents();
+        }
+
+        async function deleteAgent(id, name) {
+            if (!confirm(`Delete agent "${name}"? This cannot be undone.`)) return;
+            await apiFetch(`/api/agents/${id}`, { method: 'DELETE' });
+            toast('Agent deleted');
+            loadAgents();
+        }
+
+        async function toggleAgent(id, currentStatus) {
+            const newStatus = currentStatus === 'active' ? 'paused' : 'active';
+            await apiFetch(`/api/agents/${id}`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) });
+            toast(`Agent ${newStatus === 'active' ? 'activated' : 'paused'}`);
+            loadAgents();
+        }
+
+        function renderAgentCard(agent) {
+            const statusClass = agent.status === 'active' ? 'badge-active' : 
+                               agent.status === 'paused' ? 'badge-paused' : 'badge-suspended';
+            const created = new Date(agent.created_at).toLocaleDateString();
+            return `
+                <div class="agent-card">
+                    <div class="agent-card-header">
+                        <h3>${agent.name}</h3>
+                        <span class="badge ${statusClass}">${agent.status}</span>
+                    </div>
+                    <div class="agent-meta">
+                        <span>🧠 Model: ${agent.model}</span>
+                        <span>📅 Created: ${created}</span>
+                        ${agent.capabilities ? `<span>🔌 ${agent.capabilities}</span>` : ''}
+                    </div>
+                    ${agent.system_prompt ? `<p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px;max-height:60px;overflow:hidden;">"${agent.system_prompt.substring(0, 120)}${agent.system_prompt.length > 120 ? '...' : ''}"</p>` : ''}
+                    <div class="agent-actions">
+                        <button class="btn btn-secondary btn-sm" onclick='openEditModal(${JSON.stringify(agent)})'>Edit</button>
+                        <button class="btn btn-sm ${agent.status === 'active' ? 'btn-ghost' : 'btn-success'}" onclick="toggleAgent('${agent.id}', '${agent.status}')">${agent.status === 'active' ? '⏸ Pause' : '▶ Activate'}</button>
+                        <button class="btn btn-ghost btn-sm" onclick="deleteAgent('${agent.id}', '${agent.name}')" style="color:var(--danger)">Delete</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadAgents() {
+            const res = await apiFetch('/api/agents');
+            if (!res) return;
+            const data = await res.json();
+            const agents = data.agents || [];
+            
+            const grid = document.getElementById('agents-grid');
+            const empty = document.getElementById('empty-state');
+            
+            if (agents.length === 0) {
+                grid.innerHTML = '';
+                grid.appendChild(empty);
+                empty.style.display = 'block';
+            } else {
+                grid.innerHTML = agents.map(renderAgentCard).join('');
+            }
+
+            document.getElementById('stat-total').textContent = agents.length;
+            document.getElementById('stat-active').textContent = agents.filter(a => a.status === 'active').length;
+            document.getElementById('stat-paused').textContent = agents.filter(a => a.status !== 'active').length;
+        }
+
+        async function loadUser() {
+            const res = await apiFetch('/api/auth/me');
+            if (!res) return;
+            currentUser = await res.json();
+            document.getElementById('user-name').textContent = currentUser.name || 'User';
+            document.getElementById('user-email').textContent = currentUser.email;
+            document.getElementById('settings-email').value = currentUser.email;
+            document.getElementById('settings-name').value = currentUser.name;
+        }
+
+        // Init
+        if (!getToken()) { window.location.href = '/login'; }
+        else { loadUser(); loadAgents(); }
+    </script>
+</body>
+</html>
